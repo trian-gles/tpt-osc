@@ -131,20 +131,30 @@ end
 
 
 MasterHandler = {
-    yHandler = DistributionHandler:new(),
-    xHandler = DistributionHandler:new(),
-    velXHandler = GaussDistributionHandler:new(),
-    velYHandler = GaussDistributionHandler:new()
+    yHandler = nil,
+    xHandler = nil,
+    velXHandler = nil,
+    velYHandler = nil
 }
 
 function MasterHandler:new()
     local o = {}
     setmetatable(o, self)
+
+    
     self.__index = self
+    self.p_index = 0
+    self.p_count = 0
+
+    o.yHandler = DistributionHandler:new()
+    o.xHandler = DistributionHandler:new()
+    o.velXHandler = GaussDistributionHandler:new()
+    o.velYHandler = GaussDistributionHandler:new()
     return o
 end
 
 function MasterHandler:update(p_index)
+    self.p_index = sim.partProperty(p_index, sim.FIELD_TYPE)
     local y = sim.partProperty(p_index, sim.FIELD_Y)
     local x = sim.partProperty(p_index, sim.FIELD_X)
     local xvel = sim.partProperty(p_index, sim.FIELD_VX)
@@ -154,6 +164,7 @@ function MasterHandler:update(p_index)
     self.xHandler:update(x)
     self.velXHandler:update(xvel)
     self.velYHandler:update(yvel)
+    self.p_count = self.p_count + 1
 end
 
 function MasterHandler:get()
@@ -162,7 +173,7 @@ function MasterHandler:get()
     local sigXVel, muXVel = self.velXHandler:get();
     local sigYVel, muYVel = self.velYHandler:get();
     local sigVel = math.sqrt(sigXVel^2 + sigYVel^2)
-    return sigVel, maxy, miny, maxx, maxy
+    return self.p_count, sigVel, maxy, miny, maxx, maxy
 end
 
 function MasterHandler:reset()
@@ -170,6 +181,7 @@ function MasterHandler:reset()
     self.xHandler:reset()
     self.velXHandler:reset()
     self.velYHandler:reset()
+    self.p_count = 0
 end
 
 
@@ -220,7 +232,6 @@ local function tick()
     end
 
     local sorted = sorter:getres()
-    --print(sorted[1])
 
     -- Loop over all particles
     p_iter = sim.parts()
@@ -238,8 +249,9 @@ local function tick()
             
             local type = sim.partProperty(p_index, sim.FIELD_TYPE)
             local rank = get_key_for_value(sorted, type)
-            if rank ~= nil then
+            if (rank ~= nil) and (rank <= HANDLERCOUNT) then
                 topHandlers[rank]:update(p_index)
+                print(rank)
             end
 
             total_parts = total_parts + 1
@@ -249,20 +261,23 @@ local function tick()
 
 
     -- Extract params from distributions and send over OSC
-    local sigVel, maxy, miny, maxx, minx = topHandlers[1]:get()
+    for i=1,HANDLERCOUNT do
+        local p_count, sigVel, maxy, miny, maxx, minx = topHandlers[i]:get()
 
-    if isnan(sigVel) then
-        sigVel = 0
+        if isnan(sigVel) then
+            sigVel = 0
+        end
+        
+        local message = osc.new_message {
+            address = '/tpt/' .. tostring(i),
+            types = 'ifffff',
+            p_count, sigVel, maxy, miny, maxx, minx
+        }
+        
+        -- print(dump(message:args()))
+        osc:send(message)
     end
     
-    local message = osc.new_message {
-        address = '/pcount',
-        types = 'ifffff',
-        total_parts, sigVel, maxy, miny, maxx, minx
-      }
-    
-    -- print(dump(message:args()))
-    osc:send(message)
     frame = frame + 1
 end
 
