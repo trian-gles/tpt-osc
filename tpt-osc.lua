@@ -7,6 +7,22 @@ local osc = losc.new {plugin = udp}
 local MIN = 100000
 local MAX = -100000
 
+local HANDLERCOUNT = 6
+
+local function dump(o)
+    if type(o) == 'table' then
+       local s = '{ '
+       for k,v in pairs(o) do
+          if type(k) ~= 'number' then k = '"'..k..'"' end
+          s = s .. '['..k..'] = ' .. dump(v) .. ','
+       end
+       return s .. '} '
+    else
+       return tostring(o)
+    end
+ end
+
+
 local function isnan(v)
     return (tostring(v) == "nan")
 end
@@ -114,11 +130,71 @@ function ParticleIdCountSorter:reset()
 end
 
 
+MasterHandler = {
+    yHandler = DistributionHandler:new(),
+    xHandler = DistributionHandler:new(),
+    velXHandler = GaussDistributionHandler:new(),
+    velYHandler = GaussDistributionHandler:new()
+}
 
-local yHandler = DistributionHandler:new()
-local xHandler = DistributionHandler:new()
-local velXHandler = GaussDistributionHandler:new()
-local velYHandler = GaussDistributionHandler:new()
+function MasterHandler:new()
+    local o = {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
+function MasterHandler:update(p_index)
+    local y = sim.partProperty(p_index, sim.FIELD_Y)
+    local x = sim.partProperty(p_index, sim.FIELD_X)
+    local xvel = sim.partProperty(p_index, sim.FIELD_VX)
+    local yvel = sim.partProperty(p_index, sim.FIELD_VY)
+
+    self.yHandler:update(y)
+    self.xHandler:update(x)
+    self.velXHandler:update(xvel)
+    self.velYHandler:update(yvel)
+end
+
+function MasterHandler:get()
+    local miny, maxy = self.yHandler:get();
+    local minx, maxx = self.xHandler:get();
+    local sigXVel, muXVel = self.velXHandler:get();
+    local sigYVel, muYVel = self.velYHandler:get();
+    local sigVel = math.sqrt(sigXVel^2 + sigYVel^2)
+    return sigVel, maxy, miny, maxx, maxy
+end
+
+function MasterHandler:reset()
+    self.yHandler:reset()
+    self.xHandler:reset()
+    self.velXHandler:reset()
+    self.velYHandler:reset()
+end
+
+
+
+
+local handler = MasterHandler:new()
+
+local topHandlers = {}
+
+for i=1,HANDLERCOUNT do
+    topHandlers[i] = MasterHandler:new()
+end
+
+local function resetHandlers()
+    for i=1,HANDLERCOUNT do
+        topHandlers[i]:reset()
+    end
+end
+
+local function get_key_for_value( t, value )
+    for k,v in pairs(t) do
+      if v==value then return k end
+    end
+    return nil
+end
 
 local sorter = ParticleIdCountSorter:new()
 
@@ -126,10 +202,8 @@ local frame = 0
 
 local function tick()
     -- Reset all distributions
-    xHandler:reset()
-    yHandler:reset()
-    velXHandler:reset()
-    velYHandler:reset()
+    resetHandlers()
+    sorter:reset()
 
     -- Sort particles by most common type
     local p_iter = sim.parts()
@@ -146,13 +220,12 @@ local function tick()
     end
 
     local sorted = sorter:getres()
-    print(sorted[1])
+    --print(sorted[1])
 
     -- Loop over all particles
     p_iter = sim.parts()
     local total_parts = 0
 
-    local part_dict = {}
 
     while true do
         local p_index = p_iter()
@@ -163,15 +236,12 @@ local function tick()
         local yvel = sim.partProperty(p_index, sim.FIELD_VY)
         if (xvel ~= 0 and yvel ~=0) then
             
-            local y = sim.partProperty(p_index, sim.FIELD_Y)
-            local x = sim.partProperty(p_index, sim.FIELD_X)
             local type = sim.partProperty(p_index, sim.FIELD_TYPE)
-            
+            local rank = get_key_for_value(sorted, type)
+            if rank ~= nil then
+                topHandlers[rank]:update(p_index)
+            end
 
-            yHandler:update(y)
-            xHandler:update(x)
-            velXHandler:update(xvel)
-            velYHandler:update(yvel)
             total_parts = total_parts + 1
         end
     end
@@ -179,21 +249,19 @@ local function tick()
 
 
     -- Extract params from distributions and send over OSC
-    local miny, maxy = yHandler:get();
-    local minx, maxx = xHandler:get();
-    local sigXVel, muXVel = velXHandler:get();
-    local sigYVel, muYVel = velYHandler:get();
-    local sigVel = math.sqrt(sigXVel^2 + sigYVel^2)
+    local sigVel, maxy, miny, maxx, minx = topHandlers[1]:get()
 
     if isnan(sigVel) then
         sigVel = 0
     end
-
+    
     local message = osc.new_message {
         address = '/pcount',
         types = 'ifffff',
         total_parts, sigVel, maxy, miny, maxx, minx
       }
+    
+    -- print(dump(message:args()))
     osc:send(message)
     frame = frame + 1
 end
