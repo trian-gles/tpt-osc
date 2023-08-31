@@ -9,6 +9,10 @@ local MAX = -100000
 
 local HANDLERCOUNT = 6
 
+--------------------
+-- UTILITY FUNCTIONS
+--------------------
+
 local function dump(o)
     if type(o) == 'table' then
        local s = '{ '
@@ -26,6 +30,32 @@ local function dump(o)
 local function isnan(v)
     return (tostring(v) == "nan")
 end
+
+local function getKeyForValue( t, value )
+    for k,v in pairs(t) do
+      if v==value then return k end
+    end
+    return nil
+end
+
+function reorder_second_array(first_array, second_array)
+    local element_to_index = {}
+    for index, element in ipairs(first_array) do
+        element_to_index[element] = index
+    end
+    
+    table.sort(second_array, function(a, b)
+        local index_a = element_to_index[a] or math.huge
+        local index_b = element_to_index[b] or math.huge
+        return index_a < index_b
+    end)
+    
+    return second_array
+end
+
+--------------------
+-- DISTRIBUTION CLASSES
+--------------------
 
 DistributionHandler = {
     min = MIN,
@@ -91,6 +121,40 @@ end
 function GaussDistributionHandler:count()
     return #self.samples
 end
+
+
+MultiGaussDistHandler = {
+	self.samples = {}
+}
+
+function MultiGaussDistHandler:update(v) 
+    table.insert(self.samples, v)
+end
+
+function MultiGaussDistHandler:new()
+    local o = {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
+function MultiGaussDistHandler:count()
+    return #self.samples
+end
+
+function MultiGaussDistHandler:get()
+	-- NEEDS TO BE FINISHED
+	
+	-- Calculate means
+	local means = {}
+	for _, arr in ipairs(self.samples) do
+		
+	end
+
+	-- Make covariance matrix
+end
+
+
 
 ParticleIdCountSorter = {
     idCounts = {},
@@ -185,7 +249,9 @@ function MasterHandler:reset()
 end
 
 
-
+--------------------
+-- SETUP
+--------------------
 
 local handler = MasterHandler:new()
 
@@ -201,16 +267,15 @@ local function resetHandlers()
     end
 end
 
-local function get_key_for_value( t, value )
-    for k,v in pairs(t) do
-      if v==value then return k end
-    end
-    return nil
-end
+
 
 local sorter = ParticleIdCountSorter:new()
 
 local frame = 0
+
+--------------------
+-- MAIN LOOP
+--------------------
 
 local function tick()
     -- Reset all distributions
@@ -232,7 +297,11 @@ local function tick()
     end
 
     local sorted = sorter:getres()
+	if (lastSorted ~= nil) then
+		reorder_second_array(lastSorted, sorted)
+	end
 
+	local lastSorted = sorted
     -- Loop over all particles
     p_iter = sim.parts()
     local total_parts = 0
@@ -248,7 +317,7 @@ local function tick()
         if (xvel ~= 0 and yvel ~=0) then
             
             local type = sim.partProperty(p_index, sim.FIELD_TYPE)
-            local rank = get_key_for_value(sorted, type)
+            local rank = getKeyForValue(sorted, type)
             if (rank ~= nil) and (rank <= HANDLERCOUNT) then
                 topHandlers[rank]:update(p_index)
                 print(rank)
