@@ -104,6 +104,9 @@ function GaussDistributionHandler:reset()
 end
 
 function GaussDistributionHandler:get()
+    if self:count() == 0 then
+        return 0, 0
+    end
     local mu = 0
     for i, v in pairs(self.samples) do
         mu = mu + v
@@ -124,7 +127,7 @@ end
 
 
 MultiGaussDistHandler = {
-	self.samples = {}
+	samples = {}
 }
 
 function MultiGaussDistHandler:update(v) 
@@ -198,7 +201,8 @@ MasterHandler = {
     yHandler = nil,
     xHandler = nil,
     velXHandler = nil,
-    velYHandler = nil
+    velYHandler = nil,
+    tempHandler = nil
 }
 
 function MasterHandler:new()
@@ -214,6 +218,7 @@ function MasterHandler:new()
     o.xHandler = DistributionHandler:new()
     o.velXHandler = GaussDistributionHandler:new()
     o.velYHandler = GaussDistributionHandler:new()
+    o.tempHandler = GaussDistributionHandler:new()
     return o
 end
 
@@ -223,11 +228,13 @@ function MasterHandler:update(p_index)
     local x = sim.partProperty(p_index, sim.FIELD_X)
     local xvel = sim.partProperty(p_index, sim.FIELD_VX)
     local yvel = sim.partProperty(p_index, sim.FIELD_VY)
+    local temp = sim.partProperty(p_index, sim.FIELD_TEMP)
 
     self.yHandler:update(y)
     self.xHandler:update(x)
     self.velXHandler:update(xvel)
     self.velYHandler:update(yvel)
+    self.tempHandler:update(temp)
     self.p_count = self.p_count + 1
 end
 
@@ -237,7 +244,8 @@ function MasterHandler:get()
     local sigXVel, muXVel = self.velXHandler:get();
     local sigYVel, muYVel = self.velYHandler:get();
     local sigVel = math.sqrt(sigXVel^2 + sigYVel^2)
-    return self.p_count, sigVel, maxy, miny, maxx, maxy
+    local sigTemp, muTemp = self.tempHandler:get()
+    return self.p_count, sigTemp, sigVel, maxy, miny, maxx, maxy
 end
 
 function MasterHandler:reset()
@@ -245,6 +253,7 @@ function MasterHandler:reset()
     self.xHandler:reset()
     self.velXHandler:reset()
     self.velYHandler:reset()
+    self.tempHandler:reset()
     self.p_count = 0
 end
 
@@ -273,6 +282,8 @@ local sorter = ParticleIdCountSorter:new()
 
 local frame = 0
 
+local lastSorted = nil
+
 --------------------
 -- MAIN LOOP
 --------------------
@@ -298,10 +309,10 @@ local function tick()
 
     local sorted = sorter:getres()
 	if (lastSorted ~= nil) then
-		reorder_second_array(lastSorted, sorted)
+		sorted = reorder_second_array(lastSorted, sorted)
 	end
 
-	local lastSorted = sorted
+	lastSorted = sorted
     -- Loop over all particles
     p_iter = sim.parts()
     local total_parts = 0
@@ -320,7 +331,6 @@ local function tick()
             local rank = getKeyForValue(sorted, type)
             if (rank ~= nil) and (rank <= HANDLERCOUNT) then
                 topHandlers[rank]:update(p_index)
-                print(rank)
             end
 
             total_parts = total_parts + 1
@@ -331,16 +341,14 @@ local function tick()
 
     -- Extract params from distributions and send over OSC
     for i=1,HANDLERCOUNT do
-        local p_count, sigVel, maxy, miny, maxx, minx = topHandlers[i]:get()
-
+        local p_count, sigTemp, sigVel, maxy, miny, maxx, minx = topHandlers[i]:get()
         if isnan(sigVel) then
             sigVel = 0
         end
-        
         local message = osc.new_message {
             address = '/tpt/' .. tostring(i),
-            types = 'ifffff',
-            p_count, sigVel, maxy, miny, maxx, minx
+            types = 'iffffff',
+            p_count, sigTemp, sigVel, maxy, miny, maxx, minx
         }
         
         -- print(dump(message:args()))
