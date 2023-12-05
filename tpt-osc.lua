@@ -7,7 +7,10 @@ local osc = losc.new {plugin = udp}
 local MIN = 100000
 local MAX = -100000
 
-local HANDLERCOUNT = 6
+local HANDLERCOUNT = 8
+
+local PLANT_ID = 20
+local VINE_ID = 114
 
 --------------------
 -- UTILITY FUNCTIONS
@@ -38,7 +41,7 @@ local function getKeyForValue( t, value )
     return nil
 end
 
-function reorder_second_array(first_array, second_array)
+local function reorder_second_array(first_array, second_array)
     local element_to_index = {}
     for index, element in ipairs(first_array) do
         element_to_index[element] = index
@@ -53,9 +56,285 @@ function reorder_second_array(first_array, second_array)
     return second_array
 end
 
+local function scale(min, max, value)
+    return (value - min) / (max - min)
+end
+
+local function int_onehot_encode(val, bins)
+    local encoding = {}
+    for i=1,bins do
+        if val == i then
+            encoding[i] = 1
+        else
+            encoding[i] = 0
+        end
+    end
+end
+
+OR, XOR, AND = 1, 3, 4
+
+local function bitoper(a, b, oper)
+   local r, m, s = 0, 2^31
+   repeat
+      s,a,b = a+b+m, a%m, b%m
+      r,m = r + m*oper%(s-a-b), m/2
+   until m < 1
+   return r
+end
+--------------------
+-- ELECTRONICS STUFF
+--------------------
+MasterElectronicHandler = {
+	handlers = {},
+    lcdHandler = {}
+}
+
+function MasterElectronicHandler:new(ids, colors)
+	local o = {}
+    setmetatable(o, self)
+    self.__index = self
+	for _, v in ipairs(ids) do
+        o.handlers[v] = ElectronicHandler:new(v)
+    end
+    o.lcdHandler = LCDHandler:new(colors)
+	o:reset()
+    return o
+end
+
+function MasterElectronicHandler:update(index, type)
+    if self.handlers[type] then
+        local life = sim.partProperty(index, sim.FIELD_LIFE)
+        if (life > 0) then self.handlers[type]:update(life) end
+        
+    end
+
+    if type == 54 then
+        self.lcdHandler:update(index, sim.partProperty(index, sim.FIELD_DCOLOUR))
+    end
+end
+
+function MasterElectronicHandler:reset()
+    for _, h in pairs(self.handlers) do
+        h:reset()
+    end
+    self.lcdHandler:reset()
+end
+
+function MasterElectronicHandler:get()
+    local info = {}
+    for id, h in pairs(self.handlers) do
+        info[id] = h:get()
+    end
+
+    return info, self.lcdHandler:get()
+end
+
+
+ElectronicHandler = {
+	active = false,
+    maxLife = 0,
+    id = 0
+}
+
+function ElectronicHandler:new(id)
+	local o = {}
+    setmetatable(o, self)
+    self.__index = self
+	o.id = id
+	o:reset()
+	
+    return o
+end
+
+function ElectronicHandler:reset()
+    self.active = 0
+    self.maxLife = 0
+end
+
+function ElectronicHandler:update(life)
+    if life > self.maxLife then
+        self.maxLife = life
+    end
+end
+
+function ElectronicHandler:get()
+    return self.maxLife
+end
+
+
+
+
+LCDHandler = {
+	active = false,
+    maxLife = 0,
+    handlers = {}
+
+}
+
+function LCDHandler:new(colors)
+	local o = {}
+    setmetatable(o, self)
+    self.__index = self
+	for _, v in ipairs(colors) do
+        o.handlers[v] = ElectronicHandler:new(v)
+    end
+	o:reset()
+	
+    return o
+end
+
+function LCDHandler:update(index, color)
+    if self.handlers[color] then
+        local life = sim.partProperty(index, sim.FIELD_LIFE)
+        if (life > 0) then self.handlers[color]:update(life) end
+    end
+end
+
+function LCDHandler:reset()
+    for _, h in pairs(self.handlers) do
+        h:reset()
+    end
+end
+
+function LCDHandler:get()
+    local info = {}
+    for id, h in pairs(self.handlers) do
+        info[id] = h:get()
+    end
+
+    return info
+end
+
+
 --------------------
 -- DISTRIBUTION CLASSES
 --------------------
+
+BinHandler = {
+	binCount = 0
+	
+}
+
+function BinHandler:new(count)
+	local o = {}
+    setmetatable(o, self)
+    self.__index = self
+	o.bins = {}
+	o.binCount = count
+	o:reset()
+	
+    return o
+end
+
+function BinHandler:reset()
+    
+	for i=1,self.binCount do
+		self.bins[i] = 0
+		
+	end
+end
+
+function BinHandler:update(index)
+	self.bins[index] = self.bins[index] + 1
+end
+
+function BinHandler:get()
+	return self.bins
+end
+
+PlantHandler = {
+	oldPlants = {},
+	continuingPlants = {},
+	newPlants = {},
+	newBins = {}
+}
+
+function PlantHandler:new()
+    local o = {}
+    setmetatable(o, self)
+    self.__index = self
+	o.oldPlants = {}
+	o.continuingPlants = {}
+	o.oldBins = BinHandler:new(16)
+	o.newBins = BinHandler:new(16)
+    o.deletedBins = BinHandler:new(16)
+    return o
+end
+
+function PlantHandler:reset()
+	self.oldPlants = self.continuingPlants
+	
+	self.continuingPlants = {}
+	self.oldBins:reset()
+	self.newBins:reset()
+    self.deletedBins:reset()
+end
+
+function PlantHandler:update(index)
+	local x, y = sim.partPosition(index)
+	local bin = math.floor(16 * (383 - y) / 383) + 1
+	self.continuingPlants[index] = true
+	-- only for new plants
+	if (self.oldPlants[index] == nil) then
+		self.newBins:update(bin)
+	else
+		self.oldBins:update(bin)
+        self.oldPlants[index] = false
+	end
+	
+	
+end
+
+function PlantHandler:get()
+    for index, v in pairs(self.oldPlants) do
+        if (v) then
+            local x, y = sim.partPosition(index)
+            if (y ~= nil) then   
+	            local bin = math.floor(16 * (383 - y) / 383) + 1
+                self.deletedBins:update(bin)
+            end
+        end
+    end
+
+	return self.newBins:get(), self.oldBins:get(), self.deletedBins:get()
+
+end
+
+LifeHandler = {
+    oldPlants = {},
+	continuingPlants = {},
+    newCount = 0
+}
+
+function LifeHandler:new()
+    local o = {}
+    setmetatable(o, self)
+    self.__index = self
+	o.oldPlants = {}
+	o.continuingPlants = {}
+    o.newCount = 0
+    return o
+end
+
+function LifeHandler:reset()
+	self.oldPlants = self.continuingPlants
+	self.continuingPlants = {}
+    self.newCount = 0
+end
+
+function LifeHandler:update(index)
+	self.continuingPlants[index] = true
+	-- only for new plants
+	if (self.oldPlants[index] == nil) then
+		self.newCount = self.newCount + 1
+	else
+        self.oldPlants[index] = false
+	end
+end
+
+function LifeHandler:get()
+    return self.newCount
+end
 
 DistributionHandler = {
     min = MIN,
@@ -113,12 +392,12 @@ function GaussDistributionHandler:get()
     end
     mu = mu / self:count()
 
-    local sigma = 0
+    --local sigma = 0
     for i, v in pairs(self.samples) do
-        sigma = sigma + (v - mu)^2
+    --    sigma = sigma + (v - mu)^2
     end
-    sigma = math.sqrt(sigma / self:count())
-    return mu, sigma
+    --sigma = math.sqrt(sigma / self:count())
+    return mu, 0
 end
 
 function GaussDistributionHandler:count()
@@ -200,8 +479,7 @@ end
 MasterHandler = {
     yHandler = nil,
     xHandler = nil,
-    velXHandler = nil,
-    velYHandler = nil,
+    velHandler = nil,
     tempHandler = nil
 }
 
@@ -214,45 +492,56 @@ function MasterHandler:new()
     self.p_index = 0
     self.p_count = 0
 
-    o.yHandler = DistributionHandler:new()
+    o.yHandler = GaussDistributionHandler:new()
     o.xHandler = DistributionHandler:new()
-    o.velXHandler = GaussDistributionHandler:new()
-    o.velYHandler = GaussDistributionHandler:new()
+
+    o.velHandler = GaussDistributionHandler:new()
+
     o.tempHandler = GaussDistributionHandler:new()
     return o
 end
 
 function MasterHandler:update(p_index)
     self.p_index = sim.partProperty(p_index, sim.FIELD_TYPE)
+
     local y = sim.partProperty(p_index, sim.FIELD_Y)
     local x = sim.partProperty(p_index, sim.FIELD_X)
     local xvel = sim.partProperty(p_index, sim.FIELD_VX)
     local yvel = sim.partProperty(p_index, sim.FIELD_VY)
     local temp = sim.partProperty(p_index, sim.FIELD_TEMP)
-
+    
     self.yHandler:update(y)
     self.xHandler:update(x)
-    self.velXHandler:update(xvel)
-    self.velYHandler:update(yvel)
+    self.velHandler:update(math.sqrt(xvel^2 + yvel^2))
     self.tempHandler:update(temp)
     self.p_count = self.p_count + 1
 end
 
 function MasterHandler:get()
-    local miny, maxy = self.yHandler:get();
+    local muY, sigY = self.yHandler:get();
     local minx, maxx = self.xHandler:get();
-    local sigXVel, muXVel = self.velXHandler:get();
-    local sigYVel, muYVel = self.velYHandler:get();
-    local sigVel = math.sqrt(sigXVel^2 + sigYVel^2)
-    local sigTemp, muTemp = self.tempHandler:get()
-    return self.p_count, sigTemp, sigVel, maxy, miny, maxx, maxy
+
+    local muVel, sigVel = self.velHandler:get();
+
+    local muTemp, sigTemp = self.tempHandler:get()
+    muTemp = scale(0, 2100, muTemp)
+
+
+    local props = elements.property(self.p_index, "Properties")
+    local liquid = math.min(bitoper(props, elements.TYPE_LIQUID, AND), 1)
+    local powder = math.min(bitoper(props, elements.TYPE_PART, AND), 1)
+    local gas = math.min(bitoper(props, elements.TYPE_GAS, AND), 1)
+    local energy = math.min(bitoper(props, elements.TYPE_ENERGY, AND), 1)
+
+    -- print(string.format("pcount %d liquid %d powder %d gas %d energy %d", self.p_count, liquid, powder, gas, energy))
+
+    return self.p_count, muTemp, muVel, liquid, powder, gas, energy, muY, sigY, minx, maxx
 end
 
 function MasterHandler:reset()
     self.yHandler:reset()
     self.xHandler:reset()
-    self.velXHandler:reset()
-    self.velYHandler:reset()
+    self.velHandler:reset()
     self.tempHandler:reset()
     self.p_count = 0
 end
@@ -262,9 +551,12 @@ end
 -- SETUP
 --------------------
 
-local handler = MasterHandler:new()
+local plantHandler = PlantHandler:new()
+local lifeHandler = LifeHandler:new()
 
 local topHandlers = {}
+
+local masterElecHandler = MasterElectronicHandler:new({127, 56, 87}, {4278190335, 4294901760, 4294967040, 4294902015, 4278255615})
 
 for i=1,HANDLERCOUNT do
     topHandlers[i] = MasterHandler:new()
@@ -274,6 +566,9 @@ local function resetHandlers()
     for i=1,HANDLERCOUNT do
         topHandlers[i]:reset()
     end
+    lifeHandler:reset()
+    plantHandler:reset()
+    masterElecHandler:reset()
 end
 
 
@@ -289,15 +584,20 @@ local lastSorted = nil
 --------------------
 
 local function tick()
+    -- timing
+    local currTime = os.clock()
+
     -- Reset all distributions
     resetHandlers()
     sorter:reset()
+    
 
     -- Sort particles by most common type
     local p_iter = sim.parts()
     while true do
         local p_index = p_iter()
         if p_index == nil then break end
+
 
         -- Only handle this particle if it is moving
         local xvel = sim.partProperty(p_index, sim.FIELD_VX)
@@ -317,17 +617,27 @@ local function tick()
     p_iter = sim.parts()
     local total_parts = 0
 
-
     while true do
         local p_index = p_iter()
         if p_index == nil then break end
 
         -- Only handle this particle if it is moving
+
+        local type = sim.partProperty(p_index, sim.FIELD_TYPE)
         local xvel = sim.partProperty(p_index, sim.FIELD_VX)
         local yvel = sim.partProperty(p_index, sim.FIELD_VY)
+
+        if (type == PLANT_ID or type == VINE_ID) then
+            plantHandler:update(p_index)
+        elseif (elements.property(type, "MenuSection") == elem.SC_LIFE) then
+            lifeHandler:update(p_index)
+        else 
+            masterElecHandler:update(p_index, type)
+        end
+
         if (xvel ~= 0 and yvel ~=0) then
             
-            local type = sim.partProperty(p_index, sim.FIELD_TYPE)
+            
             local rank = getKeyForValue(sorted, type)
             if (rank ~= nil) and (rank <= HANDLERCOUNT) then
                 topHandlers[rank]:update(p_index)
@@ -341,21 +651,103 @@ local function tick()
 
     -- Extract params from distributions and send over OSC
     for i=1,HANDLERCOUNT do
-        local p_count, sigTemp, sigVel, maxy, miny, maxx, minx = topHandlers[i]:get()
-        if isnan(sigVel) then
-            sigVel = 0
+        local p_count, muTemp, muVel, liquid, powder, gas, energy, muy, sigy, maxx, minx = topHandlers[i]:get()
+        if (0 < muVel and muVel < 0.0000000000000000001) then
+            --print("Mu vel too tiny!")
+            muVel = 0.00000000000000001
         end
+
+
+
+        if isnan(muVel) then
+            muVel = 0
+        end
+        -- print (muTemp)
         local message = osc.new_message {
             address = '/tpt/' .. tostring(i),
-            types = 'iffffff',
-            p_count, sigTemp, sigVel, maxy, miny, maxx, minx
+            types = 'iffffffffff',
+            p_count, muTemp, muVel, liquid, powder, gas, energy, muy, sigy, maxx, minx
         }
         
-        -- print(dump(message:args()))
+        --print(dump(message:args()))
         osc:send(message)
     end
+
+    -- Params for 
     
+
+    -- Params for plants
+    local newPlantBins, oldPlantBins, deletedPlantBins = plantHandler:get()
+
+    local newPlantMessage = osc.new_message {
+        address = '/tptplantnew/',
+        types = 'iiiiiiiiiiiiiiii',
+        unpack(newPlantBins)
+    }
+    
+
+    local oldPlantMessage = osc.new_message {
+        address = '/tptplantold/',
+        types = 'iiiiiiiiiiiiiiii',
+        unpack(oldPlantBins)
+    }
+
+    local deletedPlantMessage = osc.new_message {
+        address = '/tptplantdel/',
+        types = 'iiiiiiiiiiiiiiii',
+        unpack(deletedPlantBins)
+    }
+    osc:send(oldPlantMessage)
+    osc:send(deletedPlantMessage)
+    osc:send(newPlantMessage)
+
+    -- Params for life
+    
+    local lifeMessage = osc.new_message {
+        address = '/tptlife/',
+        types = 'i',
+        lifeHandler:get()
+    }
+    osc:send(lifeMessage)
+
+
+    local elecLifetimes, lcdLifetimes = masterElecHandler:get()
+
+    for i, v in pairs(elecLifetimes) do
+        local electMessage = osc.new_message {
+            address = "/tptelec/" .. tostring(i) .. "/",
+            types = 'i',
+            v
+        }
+        osc:send(electMessage)
+        -- print(i)
+    end
+
+    for i, v in pairs(lcdLifetimes) do
+        local addr
+        if (v > 0) then
+            addr = "on"
+        else
+            addr = "off"
+        end
+        local val = i % 7
+
+        local lcdMessage = osc.new_message {
+            address = "/tptlcd/" .. addr .. "/",
+            types = 'i',
+            val
+        }
+
+        osc:send(lcdMessage)
+    end
+
+    
+    
+
     frame = frame + 1
+
+    -- timing
+    --print(string.format("elapsed time: %.2f\n", os.clock() - currTime))
 end
 
 evt.register(evt.tick, tick)
