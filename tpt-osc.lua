@@ -12,6 +12,15 @@ local HANDLERCOUNT = 8
 local PLANT_ID = 20
 local VINE_ID = 114
 
+local alpha = 255
+local title_text = ""
+local fade = false
+
+HANDLEGRAINS = false
+HANDLEPLANTS = false
+HANDLELIFE = false
+HANDLEELEC = true
+
 --------------------
 -- UTILITY FUNCTIONS
 --------------------
@@ -86,7 +95,8 @@ end
 --------------------
 MasterElectronicHandler = {
 	handlers = {},
-    lcdHandler = {}
+    lcdHandler = {},
+	switchHandler = {}
 }
 
 function MasterElectronicHandler:new(ids, colors)
@@ -97,11 +107,13 @@ function MasterElectronicHandler:new(ids, colors)
         o.handlers[v] = ElectronicHandler:new(v)
     end
     o.lcdHandler = LCDHandler:new(colors)
+	o.switchHandler = SwitchHandler:new()
 	o:reset()
     return o
 end
 
 function MasterElectronicHandler:update(index, type)
+
     if self.handlers[type] then
         local life = sim.partProperty(index, sim.FIELD_LIFE)
         if (life > 0) then self.handlers[type]:update(life) end
@@ -110,6 +122,13 @@ function MasterElectronicHandler:update(index, type)
 
     if type == 54 then
         self.lcdHandler:update(index, sim.partProperty(index, sim.FIELD_DCOLOUR))
+	elseif type == 56 then
+		local life = sim.partProperty(index, sim.FIELD_LIFE)
+		if (life > 0) then
+			local x = sim.partProperty(index, sim.FIELD_X)
+			self.switchHandler:update(life, x)
+		end
+		
     end
 end
 
@@ -118,6 +137,7 @@ function MasterElectronicHandler:reset()
         h:reset()
     end
     self.lcdHandler:reset()
+	self.switchHandler:reset()
 end
 
 function MasterElectronicHandler:get()
@@ -125,8 +145,9 @@ function MasterElectronicHandler:get()
     for id, h in pairs(self.handlers) do
         info[id] = h:get()
     end
+	
 
-    return info, self.lcdHandler:get()
+    return info, self.lcdHandler:get(), self.switchHandler:get()
 end
 
 
@@ -161,6 +182,35 @@ function ElectronicHandler:get()
     return self.maxLife
 end
 
+
+SwitchHandler = {
+	active = false,
+    weightedMaxLife = 0
+
+}
+
+function SwitchHandler:new()
+	local o = {}
+    setmetatable(o, self)
+    self.__index = self
+	o:reset()
+	
+    return o
+end
+
+function SwitchHandler:reset()
+    self.active = 0
+    self.weightedLife = 0
+end
+
+function SwitchHandler:update(life, x)
+    self.weightedLife = math.pow(x, 3) * life / 60000000  + self.weightedLife
+end
+
+
+function SwitchHandler:get()
+    return self.weightedLife
+end
 
 
 
@@ -392,12 +442,12 @@ function GaussDistributionHandler:get()
     end
     mu = mu / self:count()
 
-    --local sigma = 0
+    local sigma = 0
     for i, v in pairs(self.samples) do
-    --    sigma = sigma + (v - mu)^2
+        sigma = sigma + (v - mu)^2
     end
-    --sigma = math.sqrt(sigma / self:count())
-    return mu, 0
+    sigma = math.sqrt(sigma / self:count())
+    return mu, sigma
 end
 
 function GaussDistributionHandler:count()
@@ -556,7 +606,7 @@ local lifeHandler = LifeHandler:new()
 
 local topHandlers = {}
 
-local masterElecHandler = MasterElectronicHandler:new({127, 56, 87}, {4278190335, 4294901760, 4294967040, 4294902015, 4278255615})
+local masterElecHandler = MasterElectronicHandler:new({127, 87}, {4278190335, 4294901760, 4294967040, 4294902015, 4278255615})
 
 for i=1,HANDLERCOUNT do
     topHandlers[i] = MasterHandler:new()
@@ -585,38 +635,41 @@ local lastSorted = nil
 
 local function tick()
     -- timing
-    local currTime = os.clock()
+    --local currTime = os.clock()
 
     -- Reset all distributions
     resetHandlers()
     sorter:reset()
-    
-
+    local sorted
+	
+	if HANDLEGRAINS then
     -- Sort particles by most common type
-    local p_iter = sim.parts()
-    while true do
-        local p_index = p_iter()
-        if p_index == nil then break end
+		local p_iter = sim.parts()
+		while true do
+			local p_index = p_iter()
+			if p_index == nil then break end
 
 
-        -- Only handle this particle if it is moving
-        local xvel = sim.partProperty(p_index, sim.FIELD_VX)
-        local yvel = sim.partProperty(p_index, sim.FIELD_VY)
-        if (xvel ~= 0 and yvel ~=0) then
-            sorter:update(sim.partProperty(p_index, sim.FIELD_TYPE))
-        end
-    end
-
-    local sorted = sorter:getres()
-	if (lastSorted ~= nil) then
-		sorted = reorder_second_array(lastSorted, sorted)
+			-- Only handle this particle if it is moving
+			local xvel = sim.partProperty(p_index, sim.FIELD_VX)
+			local yvel = sim.partProperty(p_index, sim.FIELD_VY)
+			if (xvel ~= 0 and yvel ~=0) then
+			   sorter:update(sim.partProperty(p_index, sim.FIELD_TYPE))
+			end
+		end
+		
+		
+		sorted = sorter:getres()
+		if (lastSorted ~= nil) then
+			sorted = reorder_second_array(lastSorted, sorted)
+		end
+		
+		lastSorted = sorted
 	end
-
-	lastSorted = sorted
+	
     -- Loop over all particles
     p_iter = sim.parts()
     local total_parts = 0
-
     while true do
         local p_index = p_iter()
         if p_index == nil then break end
@@ -624,126 +677,150 @@ local function tick()
         -- Only handle this particle if it is moving
 
         local type = sim.partProperty(p_index, sim.FIELD_TYPE)
-        local xvel = sim.partProperty(p_index, sim.FIELD_VX)
-        local yvel = sim.partProperty(p_index, sim.FIELD_VY)
+		
+		
+        
 
-        if (type == PLANT_ID or type == VINE_ID) then
+        if (type == PLANT_ID or type == VINE_ID) and HANDLEPLANTS then
             plantHandler:update(p_index)
-        elseif (elements.property(type, "MenuSection") == elem.SC_LIFE) then
+        elseif (elements.property(type, "MenuSection") == elem.SC_LIFE) and HANDLELIFE then
             lifeHandler:update(p_index)
-        else 
+        elseif HANDLEELEC then
             masterElecHandler:update(p_index, type)
         end
+		
+		
+		if HANDLEGRAINS then
+			local xvel = sim.partProperty(p_index, sim.FIELD_VX)
+			local yvel = sim.partProperty(p_index, sim.FIELD_VY)
+			if (xvel ~= 0 and yvel ~=0) then
+				
+				
+				local rank = getKeyForValue(sorted, type)
+				if (rank ~= nil) and (rank <= HANDLERCOUNT) then
+					topHandlers[rank]:update(p_index)
+				end
 
-        if (xvel ~= 0 and yvel ~=0) then
-            
-            
-            local rank = getKeyForValue(sorted, type)
-            if (rank ~= nil) and (rank <= HANDLERCOUNT) then
-                topHandlers[rank]:update(p_index)
-            end
-
-            total_parts = total_parts + 1
-        end
+				total_parts = total_parts + 1
+			end
+		end
     end
-
-
-
+	
+	
+	--do return end 
     -- Extract params from distributions and send over OSC
-    for i=1,HANDLERCOUNT do
-        local p_count, muTemp, muVel, liquid, powder, gas, energy, muy, sigy, maxx, minx = topHandlers[i]:get()
-        if (0 < muVel and muVel < 0.0000000000000000001) then
-            --print("Mu vel too tiny!")
-            muVel = 0.00000000000000001
-        end
+	if HANDLEGRAINS then
+		for i=1,HANDLERCOUNT do
+			local p_count, muTemp, muVel, liquid, powder, gas, energy, muy, sigy, maxx, minx = topHandlers[i]:get()
+			if (0 < muVel and muVel < 0.0000000000000000001) then
+				--print("Mu vel too tiny!")
+				muVel = 0.00000000000000001
+			end
 
 
 
-        if isnan(muVel) then
-            muVel = 0
-        end
-        -- print (muTemp)
-        local message = osc.new_message {
-            address = '/tpt/' .. tostring(i),
-            types = 'iffffffffff',
-            p_count, muTemp, muVel, liquid, powder, gas, energy, muy, sigy, maxx, minx
-        }
-        
-        --print(dump(message:args()))
-        osc:send(message)
-    end
+			if isnan(muVel) then
+				muVel = 0
+			end
+			-- print (muTemp)
+			local message = osc.new_message {
+				address = '/tpt/' .. tostring(i),
+				types = 'iffffffffff',
+				p_count, muTemp, muVel, liquid, powder, gas, energy, muy, sigy, maxx, minx
+			}
+			
+			--print(dump(message:args()))
+			osc:send(message)
+		end
+	end
+	
+	if HANDLEPLANTS then
+		-- Params for plants
+		local newPlantBins, oldPlantBins, deletedPlantBins = plantHandler:get()
 
-    -- Params for 
-    
+		local newPlantMessage = osc.new_message {
+			address = '/tptplantnew/',
+			types = 'iiiiiiiiiiiiiiii',
+			unpack(newPlantBins)
+		}
+		
 
-    -- Params for plants
-    local newPlantBins, oldPlantBins, deletedPlantBins = plantHandler:get()
+		local oldPlantMessage = osc.new_message {
+			address = '/tptplantold/',
+			types = 'iiiiiiiiiiiiiiii',
+			unpack(oldPlantBins)
+		}
 
-    local newPlantMessage = osc.new_message {
-        address = '/tptplantnew/',
-        types = 'iiiiiiiiiiiiiiii',
-        unpack(newPlantBins)
-    }
-    
-
-    local oldPlantMessage = osc.new_message {
-        address = '/tptplantold/',
-        types = 'iiiiiiiiiiiiiiii',
-        unpack(oldPlantBins)
-    }
-
-    local deletedPlantMessage = osc.new_message {
-        address = '/tptplantdel/',
-        types = 'iiiiiiiiiiiiiiii',
-        unpack(deletedPlantBins)
-    }
-    osc:send(oldPlantMessage)
-    osc:send(deletedPlantMessage)
-    osc:send(newPlantMessage)
-
+		local deletedPlantMessage = osc.new_message {
+			address = '/tptplantdel/',
+			types = 'iiiiiiiiiiiiiiii',
+			unpack(deletedPlantBins)
+		}
+		osc:send(oldPlantMessage)
+		osc:send(deletedPlantMessage)
+		osc:send(newPlantMessage)
+	end
+	
     -- Params for life
+    if HANDLELIFE then
+		local lifeMessage = osc.new_message {
+			address = '/tptlife/',
+			types = 'i',
+			lifeHandler:get()
+		}
+		osc:send(lifeMessage)
+	end
+
+	if HANDLEELEC then
+		local elecLifetimes, lcdLifetimes, switchLife = masterElecHandler:get()
+
+		for i, v in pairs(elecLifetimes) do
+			local electMessage = osc.new_message {
+				address = "/tptelec/" .. tostring(i) .. "/",
+				types = 'i',
+				v
+			}
+			osc:send(electMessage)
+			-- print(i)
+		end
+
+		for i, v in pairs(lcdLifetimes) do
+			local addr
+			if (v > 0) then
+				addr = "on"
+			else
+				addr = "off"
+			end
+			local val = i % 7
+
+			local lcdMessage = osc.new_message {
+				address = "/tptlcd/" .. addr .. "/",
+				types = 'i',
+				val
+			}
+
+			osc:send(lcdMessage)
+		end
+		
+		-- switch message
+
+		local switchMessage = osc.new_message {
+			address = "/tptswitch/",
+			types = 'f',
+			switchLife
+		}
+
+		osc:send(switchMessage)
+		
+	end
+
     
-    local lifeMessage = osc.new_message {
-        address = '/tptlife/',
-        types = 'i',
-        lifeHandler:get()
-    }
-    osc:send(lifeMessage)
-
-
-    local elecLifetimes, lcdLifetimes = masterElecHandler:get()
-
-    for i, v in pairs(elecLifetimes) do
-        local electMessage = osc.new_message {
-            address = "/tptelec/" .. tostring(i) .. "/",
-            types = 'i',
-            v
-        }
-        osc:send(electMessage)
-        -- print(i)
-    end
-
-    for i, v in pairs(lcdLifetimes) do
-        local addr
-        if (v > 0) then
-            addr = "on"
-        else
-            addr = "off"
-        end
-        local val = i % 7
-
-        local lcdMessage = osc.new_message {
-            address = "/tptlcd/" .. addr .. "/",
-            types = 'i',
-            val
-        }
-
-        osc:send(lcdMessage)
-    end
-
     
-    
-
+	graphics.drawText(200, 200, title_text, 255, 255, 255, alpha)
+	if fade then
+		alpha = math.max(0, alpha - 1)
+	end
+	
     frame = frame + 1
 
     -- timing
@@ -751,3 +828,26 @@ local function tick()
 end
 
 evt.register(evt.tick, tick)
+
+function showText(text)
+	title_text = text
+	fade = false
+	alpha = 255
+end
+
+function keyPress(key, scan, rep_, shift_, ctrl, alt)
+	if (key == interface.SDLK_KP_0) then
+		fade = true
+	elseif (key == interface.SDLK_KP_1) then
+		showText("part 1 : bang")
+	elseif (key == interface.SDLK_KP_2) then
+		showText("part 2 : life")
+	elseif (key == interface.SDLK_KP_3) then
+		showText("part 3 : plant")
+	elseif (key == interface.SDLK_KP_4) then
+		showText("part 4 : machine")
+	end
+end
+
+
+evt.register(evt.keypress, keyPress)
