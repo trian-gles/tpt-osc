@@ -16,9 +16,9 @@ local alpha = 255
 local title_text = ""
 local fade = false
 
-HANDLEGRAINS = false
-HANDLEPLANTS = false
-HANDLELIFE = false
+HANDLEGRAINS = true
+HANDLEPLANTS = true
+HANDLELIFE = true
 HANDLEELEC = true
 
 --------------------
@@ -816,7 +816,7 @@ local function tick()
 
     
     
-	graphics.drawText(200, 200, title_text, 255, 255, 255, alpha)
+	graphics.drawText(100, 100, title_text, 255, 255, 255, alpha)
 	if fade then
 		alpha = math.max(0, alpha - 1)
 	end
@@ -827,7 +827,20 @@ local function tick()
     --print(string.format("elapsed time: %.2f\n", os.clock() - currTime))
 end
 
-evt.register(evt.tick, tick)
+evt.register(evt.tick, tick) 
+
+local mouse_x
+local mouse_y
+
+
+local function showPrimaryName()
+    local px, py = member.pos_x, member.pos_y
+
+    
+    local offx, offy = 6, -9
+    gfx.drawText(px + offx, py + offy, "KieranMc", 255, pcur_g, pcur_b, 255)
+end
+
 
 function showText(text)
 	title_text = text
@@ -836,17 +849,42 @@ function showText(text)
 end
 
 function keyPress(key, scan, rep_, shift_, ctrl, alt)
-	if (key == interface.SDLK_KP_0) then
+    if (key == interface.SDLK_KP_0) then
 		fade = true
-	elseif (key == interface.SDLK_KP_1) then
-		showText("part 1 : bang")
-	elseif (key == interface.SDLK_KP_2) then
-		showText("part 2 : life")
-	elseif (key == interface.SDLK_KP_3) then
-		showText("part 3 : plant")
-	elseif (key == interface.SDLK_KP_4) then
-		showText("part 4 : machine")
-	end
+    end
+
+    if (shift_) then
+        if (key == interface.SDLK_KP_1) then
+            showText("Protons, neutrons and electrons combine to form the first atoms")
+        elseif (key == interface.SDLK_KP_2) then
+            showText("Elements combine forming molecules")
+        elseif (key == interface.SDLK_KP_3) then
+            showText("Meanwhile, dust accumulates in low pressure areas")
+        elseif (key == interface.SDLK_KP_4) then
+            showText("Looks familiar?")
+        elseif (key == interface.SDLK_KP_5) then
+            showText("part 2 : life")
+        elseif (key == interface.SDLK_KP_6) then
+            showText("part 3 : plant")
+        elseif (key == interface.SDLK_KP_7) then
+            showText("part 4 : machine")
+        elseif (key == interface.SDLK_KP_8) then
+            showText("part 3 : plant")
+        elseif (key == interface.SDLK_KP_9) then
+            showText("")
+        end
+    else
+        if (key == interface.SDLK_KP_1) then
+            showText("part 1 : bang")
+        elseif (key == interface.SDLK_KP_2) then
+            showText("part 2 : life")
+        elseif (key == interface.SDLK_KP_3) then
+            showText("part 3 : plant")
+        elseif (key == interface.SDLK_KP_4) then
+            showText("part 4 : machine")
+        end
+    end
+	
 end
 
 
