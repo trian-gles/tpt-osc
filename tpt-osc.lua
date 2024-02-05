@@ -815,7 +815,7 @@ local function tick()
 	end
 
     
-    
+    showPrimaryName()
 	graphics.drawText(100, 100, title_text, 255, 255, 255, alpha)
 	if fade then
 		alpha = math.max(0, alpha - 1)
@@ -831,14 +831,16 @@ evt.register(evt.tick, tick)
 
 local mouse_x
 local mouse_y
+local offx, offy = 6, -9
 
 
-local function showPrimaryName()
-    local px, py = member.pos_x, member.pos_y
+function showPrimaryName()
+    gfx.drawText(mouse_x + offx, mouse_y + offy, "KieranMc", 255, 255, 255, 255)
+end
 
-    
-    local offx, offy = 6, -9
-    gfx.drawText(px + offx, py + offy, "KieranMc", 255, pcur_g, pcur_b, 255)
+local function moveMouse(x, y, dx, dy)
+	mouse_x = x
+	mouse_y = y
 end
 
 
@@ -889,3 +891,4 @@ end
 
 
 evt.register(evt.keypress, keyPress)
+evt.register(evt.mousemove, moveMouse)
