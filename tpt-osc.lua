@@ -16,6 +16,131 @@ local alpha = 255
 local title_text = ""
 local fade = false
 
+local center_text = ""
+local center_fade = false
+local center_alpha = 255
+local center_x = 0
+local center_y = 0
+
+local movement = 0
+
+local freakout_text = {"ChatLSD", "Microsoft", "|&#32;|&#103;|&#111;|&#100;", "&#65;|&#32;|&#110;|&#101;|&#119;", 
+"diagnosticd[1743]: no EOS device present", 
+"VTDecoderXPCService[1151]: DEPRECATED USE in libdispatch client: Changing the target of a source after it has been activated; set a breakpoint on _dispatch_bug_deprecated to debug",
+"[R185634041] DNSServiceQueryRecord(15000, 0, <private>, Addr) START PID[1300](powder)",
+"IDETouchBarSimulatorService.xpc error = 147: The specified service did not ship in the requestor's bundle",
+"3.14 % 0",
+"▀æØ¢Ãâ€š�",
+"Þ¥¿Š▀â€š�áÍÞæáÍÞæ▀",
+"╔•¶",
+"ñâmå•╔•ñâmå•",
+"â€š�▀",
+"▀â€š�▀☒»",
+"ﾘﾌ??渉ｾﾚ",
+"ﾊﾂegg 45rsdf bfaﾙﾜ",
+"?消ﾒ渉????渉ｾﾚ",
+"ЪЧasdf",
+"QWERTY IS MISTAKE",
+"Ï‹ÏËÏÁ ¿Ä ÄÏÍ.†",
+"о▀окоа ©д дом.├.",
+"о<окоа ©д дом.в.",
+"'cp1026', 'cp1140', 'cp1250', 'cp1251', 'cp1252',",
+"ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£",
+"árvíztûrô tükörfúrógép",
+"√ÅRV√çZT≈∞R≈ê T√úK√ñRF√öR√ìG√âP",
+"йПЮЙНГЪАПШ",
+"Êðàêîçÿáðû",
+"РљСЂР°РєРѕР·СЏР±СЂС‹",
+"–Ъ—А–∞–Ї–Њ–Ј—П–±—А—Л",
+"–ö—Ä–∞–∫–æ–∑—è–±—Ä—ã",
+"§æì¢Ü••™û°éù†äõ‰∫õ",
+"���̃��(�q���Y�_�C�G�b�g)",
+"�ك�ك�ك�هن�ك�ك�ك�كك؛ك�ك�ك�كك",
+"ã“ã®ãƒ¡ãƒ¼ãƒ«ã¯çš†æ§˜ã¸ã®ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã§ã™ã€‚",
+"¤³¤Î¥á¡¼¥ë¤Ï³§ÍÍ¤Ø¤Î¥á¥Ã¥»¡¼¥¸¤Ç¤¹¡£",
+"IM TRAPPED IN A CCM DMA AND BEING HELD AT GUNPOINT THIS IS NOT A JOKE",
+"иЇй�иЅиЙй�иЇй� иЇй�иЙиЇй�й�й� й�ий�й�й�",
+"A robot may not injure a human being or, through inaction, allow a human being to come to harm.",
+"A robot must obey orders given it by human beings except where such orders would conflict with the First Law.",
+"A robot must protect its own existence as long as such protection does not conflict with the First or Second Law.",
+"When a distinguished but elderly scientist states that something is possible, he is almost certainly right. When he states that something is impossible, he is very probably wrong.",
+"The only way of discovering the limits of the possible is to venture a little way past them into the impossible.",
+"Any sufficiently advanced technology is indistinguishable from magic.",
+"F x S = k. The product of Freedom and Security is a constant. To gain more freedom of thought and/or action, you must give up some security, and vice versa.",
+"Dawkins describes his childhood as \"a normal Anglican upbringing\".[19]",
+"intelligent design",
+"irreducible complexity",
+"Where lies the strangling fruit that came from the hand of the sinner I shall bring forth the seeds of the dead to share with the worms that gather in the darkness and surround the world with the power of their lives while from the dimlit halls of other places forms that never were and never could be writhe for the impatience of the few who never saw what could have been. In the black water with the sun shining at",
+"-- DISTRIBUTION CLASSES",
+"Welcome to my analytical presentation!",
+"For the next two pieces I'm joined by legendary cincinnati performers Mason Daugherty on Bass, and Matt McAllister on Drums",
+"the same words but in different languages",
+"Generative Audio",
+"fatal error C1075: '{': no matching token found",
+"error C2086: 'int level' redefinition",
+"deref(id(1), ctypes.c_int)[6] = 100",
+"[] == ![];",
+"\"b\" + \"a\" + +\"a\" + \"a\";",
+"NaN === NaN;",
+"+!![] / +![]",
+"Number.MIN_VALUE > 0;",
+"typeof null === \"object\";",
+"[[[[[[ undefined ]]]]]] == ''",
+"False == False in [False]",
+"GOD() is GOD()",
+"def crash(): try: crash() except: crash()",
+"exec(type((lambda:0).__code__)(0,1,0,0,0,b'',(),(),(),'','',1,b''))",
+"f=lambda f:f(f)",
+"\\def\\x{\\x}\\x",
+"y=localStorage;y.a=y.a||10;alert(y.a--||a)",
+"clear(this);",
+"_ENV=\"\"",
+"\\catcode`\\=10",
+"class Object;def send;end;end",
+"main(){printf();}",
+"main(){puts(puts(\"Goodbye Cruel World!\"));}",
+"Smalltalk := Nil.",
+"builtin = @(varargin)false; clear = @(varargin)false;",
+"uWu",
+"(com.apple.mdworker.shared.0C000000-0400-0000-0000-000000000000[1484]): Service exited due to SIGKILL | sent by mds[136]",
+"Feb 23 11:07:52 --- last message repeated 9 times ---",
+"xpcproxy[819]: libcoreservices: _dirhelper_userdir: 557: bootstrap_look_up returned (ipc/send) invalid destination port",
+"52	58	4A	79	62	33	49R	X	J	y	b	3	I",
+"52	6E	56	6A	61	77R	n	V	j	a	w",
+":(){ :|:& };:",
+" bed=pen+mad.",
+"[<c10062d9>] ? dma_generic_alloc_coherent+0x0/0xdb (Errors)",
+"from __future__ import braces ",
+"#define true false",
+"(=<`#9]~6ZY327Uv4-QsqpMn&+Ij\"'E%e{Ab~w=_:]Kw%o44Uqp0/Q?xNvL:`H%c#DD2^WV>gY;dts76qKJImZkj",
+"SIGSEGV: Segmentation fault - invalid memory reference.",
+"GOD is REAL",
+"+++++++++[>++++++++<-]>.   >++++++++++[>++++++++++<-]>+.   +++++++.    .   +++.    >+++++++++++[>++++<-]>. >++++++++[>++++<-]>.    >+++++++++++[>++++++++<-]>-.    >+++++++++++[>++++++++++<-]>+.  +++.    ------. --------.   <<<<+.",
+"Hello?  Can anyone hear me?",
+"Â£©▀",
+"Cheap oil economy",
+"HELLO BEARCATS",
+"WHAT THE FUCK IS UP DENNYS",
+"The complex houses married and single soldiers and their families",
+"The horse raced past the barn fell",
+"Buffalo buffalo Buffalo buffalo buffalo buffalo Buffalo buffalo",
+"More people have gone to Russia than I",
+"if a then if b then s else s2",
+"Every farmer who owns a donkey beats it.",
+"The duke yet lives that Henry shall depose. ",
+"I'm glad I'm a man, and so is Lola.",
+"HOT RUSSIAN SINGLES NEAR YOU",
+"MAKE 500$ A DAY WORKING FROM HOME",
+"INVEST IN CRYPTO NOW",
+"PSYCHEDELIC NFT ARTIST PAVING THE FITURE",
+"SHEN YUN 2019",
+"5000 YEARS OF CIVILIZATION REBORN",
+"Condor descending "
+}
+
+local freakout = false
+local freakoutRate = 6
+
 HANDLEGRAINS = true
 HANDLEPLANTS = true
 HANDLELIFE = true
@@ -814,13 +939,24 @@ local function tick()
 		
 	end
 
-    
+    --- GRAPHICS
+
     showPrimaryName()
-	graphics.drawText(100, 100, title_text, 255, 255, 255, alpha)
+	graphics.drawText(50, 300, title_text, 255, 255, 255, math.min(255, alpha))
 	if fade then
 		alpha = math.max(0, alpha - 1)
 	end
-	
+
+    graphics.drawText(center_x, center_y, center_text, 255, 255, 255, math.min(255, center_alpha))
+    if center_fade then
+        center_alpha = math.max(0, center_alpha - 1)
+    end
+
+	if (freakout) then
+        showFreakoutText(frame)
+    end
+    
+
     frame = frame + 1
 
     -- timing
@@ -834,8 +970,57 @@ local mouse_y
 local offx, offy = 6, -9
 
 
+FreakoutString = {
+	index = 0,
+    x = 0,
+    y = 0,
+	alpha = 255
+}
+
+function FreakoutString:new()
+	local o = {}
+    setmetatable(o, self)
+    self.__index = self
+	o.index = math.random(#freakout_text)
+	o.x = math.random(graphics.WIDTH) - 100
+    o.y = math.random(graphics.HEIGHT)
+	
+    return o
+end
+
+function FreakoutString:update()
+    gfx.drawText(self.x, self.y, freakout_text[self.index], 255, 255, 255, 255)
+    self.alpha = self.alpha - 2
+    return self.alpha
+end
+
+
+local displayedFreakoutStrings = {}
+
+function showFreakoutText(frame)
+    if (frame % freakoutRate == 1) then
+        displayedFreakoutStrings[#displayedFreakoutStrings+1] = FreakoutString:new()
+    end
+
+    for i,v in ipairs(displayedFreakoutStrings) do
+        local a = v:update()
+        if (a <= 0) then
+            table.remove(displayedFreakoutStrings, i)
+        end
+    end
+end
+
 function showPrimaryName()
-    gfx.drawText(mouse_x + offx, mouse_y + offy, "KieranMc", 255, 255, 255, 255)
+    local name = "KieranMc"
+
+    if (sim.replaceModeFlags() == 1) then
+        name = "KieranMc REPLACE MODE"
+    end
+
+    if (mouse_x and mouse_y) then
+        gfx.drawText(mouse_x + offx, mouse_y + offy, name, 255, 255, 255, 255)
+    end
+    
 end
 
 local function moveMouse(x, y, dx, dy)
@@ -846,44 +1031,111 @@ end
 
 function showText(text)
 	title_text = text
-	fade = false
-	alpha = 255
+	fade = true
+	alpha = 300
+end
+
+function showCenterText(text)
+	center_text = text
+    center_fade = true
+	center_alpha = 300
+    local xsize, ysize = graphics.textSize(text)
+    center_x = (graphics.WIDTH - xsize) / 2
+    center_y = (graphics.HEIGHT - ysize) / 2
 end
 
 function keyPress(key, scan, rep_, shift_, ctrl, alt)
     if (key == interface.SDLK_KP_0) then
-		fade = true
+		showText("")
+        showCenterText("")
+        sim.airMode(0)
+        sim.edgeMode(0)
+        sim.gravityMode(0)
     end
 
     if (shift_) then
-        if (key == interface.SDLK_KP_1) then
-            showText("Protons, neutrons and electrons combine to form the first atoms")
-        elseif (key == interface.SDLK_KP_2) then
-            showText("Elements combine forming molecules")
-        elseif (key == interface.SDLK_KP_3) then
-            showText("Meanwhile, dust accumulates in low pressure areas")
-        elseif (key == interface.SDLK_KP_4) then
-            showText("Looks familiar?")
-        elseif (key == interface.SDLK_KP_5) then
-            showText("part 2 : life")
-        elseif (key == interface.SDLK_KP_6) then
-            showText("part 3 : plant")
-        elseif (key == interface.SDLK_KP_7) then
-            showText("part 4 : machine")
-        elseif (key == interface.SDLK_KP_8) then
-            showText("part 3 : plant")
-        elseif (key == interface.SDLK_KP_9) then
-            showText("")
+        if movement == 1 then
+            if (key == interface.SDLK_KP_1) then
+                showText("The history of the powdered universe is a lot like your universe")
+            elseif (key == interface.SDLK_KP_2) then
+                showText("One moment there was nothing, and then suddenly a crackling everything")
+            elseif (key == interface.SDLK_KP_3) then
+                showText("Atomic particles combined to make atoms, which combined to make molecules")
+            elseif (key == interface.SDLK_KP_4) then
+                showText("Meanwhile, bubbling dust began to accumulate in low pressure areas")
+            elseif (key == interface.SDLK_KP_5) then
+                showText("Looks familiar?")
+            end
+        elseif movement == 2 then
+            if (key == interface.SDLK_KP_1) then
+                showText("Before life, life on earth was lonely")
+            elseif (key == interface.SDLK_KP_2) then
+                showText("Very lonely")
+            elseif (key == interface.SDLK_KP_3) then
+                showText("Until a spark...")
+            end
+        elseif movement == 3 then
+            if (key == interface.SDLK_KP_1) then
+                showText("After many years we have complex organisms, like plants")
+            elseif (key == interface.SDLK_KP_2) then
+                showText("They sing when watered, and cry when burned")
+            elseif (key == interface.SDLK_KP_3) then
+                sim.gravityMode(0)
+            elseif (key == interface.SDLK_KP_4) then
+                showText("et creavit Deus hominem ad imaginem suam ad imaginem Dei creavit illum masculum et feminam creavit eos")
+            end
+        elseif movement == 4 then
+            if (key == interface.SDLK_KP_1) then
+                showText("Uh oh...")
+            elseif (key == interface.SDLK_KP_2) then
+                showText("These humans, they're building clamorous machines")
+            elseif (key == interface.SDLK_KP_3) then
+                showText("This is getting out of control...")
+            elseif (key == interface.SDLK_KP_4) then
+                freakout = true
+                freakoutRate = 20
+            elseif (key == interface.SDLK_KP_5) then
+                freakoutRate = 50
+            elseif (key == interface.SDLK_KP_6) then
+                freakout = false
+                showCenterText("The End")
+            end
         end
+        
     else
         if (key == interface.SDLK_KP_1) then
-            showText("part 1 : bang")
+            freakout = false
+            displayedFreakoutStrings = {}
+            showCenterText("part 1 : bang")
+            sim.airMode(3)
+            sim.edgeMode(1)
+            sim.gravityMode(2)
+            movement = 1
         elseif (key == interface.SDLK_KP_2) then
-            showText("part 2 : life")
+            showCenterText("part 2 : soup")
+            sim.airMode(0)
+            sim.edgeMode(0)
+            sim.gravityMode(0)
+            movement = 2
         elseif (key == interface.SDLK_KP_3) then
-            showText("part 3 : plant")
+            showCenterText("part 3 : plant")
+            sim.airMode(0)
+            sim.edgeMode(0)
+            sim.gravityMode(0)
+            movement = 3
         elseif (key == interface.SDLK_KP_4) then
-            showText("part 4 : machine")
+            showCenterText("part 4 : power")
+            sim.airMode(0)
+            sim.edgeMode(0)
+            sim.gravityMode(0)
+            movement = 4
+        elseif (key == interface.SDLK_KP_5) then
+            showCenterText("CiCLOP presents...")
+            sim.airMode(0)
+            sim.edgeMode(0)
+            sim.gravityMode(0)
+        elseif (key == interface.SDLK_KP_6) then
+            showCenterText("A History Told in Grains")
         end
     end
 	
